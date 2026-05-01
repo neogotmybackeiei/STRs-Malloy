@@ -1,0 +1,65 @@
+>>>markdown
+# The Airbnb Professionalisation Problem: Who Actually Controls These Markets?
+
+I came into this dataset with a simple assumption: European cities — London, Paris, Amsterdam, Barcelona, Rome — would be the most expensive Airbnb markets. They're iconic destinations, high cost-of-living, strong tourism. It seemed obvious.
+
+I started with a straightforward price comparison to confirm it.
+>>>malloy
+import "updated.malloy"
+
+run: listings -> by_city
+>>>markdown
+## Europe Is Expensive — But Not For the Reasons I Expected
+
+The price rankings roughly matched my assumption, but one number stopped me: the gap between `avg_price` and `median_price` in every city is enormous. In some markets the average is more than double the median. That only happens when a small number of very high-priced listings are pulling the mean upward.
+
+That made me ask a different question: who is running those high-priced listings? Are these outliers driven by luxury properties, or by a class of professional operators who've figured out how to extract premium pricing at scale? I shifted focus entirely — from *what* prices look like to *who* is setting them.
+>>>malloy
+import "updated.malloy"
+
+run: listings -> host_concentration
+>>>markdown
+## A Small Professional Class Controls the Majority of Supply
+
+This is where the story got interesting. In every city, the share of supply controlled by multi-listing hosts is far larger than their share of total hosts. That gap — between `pct_multi_hosts` and `pct_listings_by_multi` — is the signature of a professionalised market: a relatively small operator class controlling what most guests actually see and book.
+
+This isn't a Bangkok or Sydney phenomenon. It's consistent across every city in the dataset, including the heavily regulated European ones. That surprised me. Amsterdam and Barcelona have introduced some of the strictest short-term rental laws in the world specifically to push back against this kind of commercialisation. I expected their numbers to look different. They don't — at least not on host concentration alone.
+
+So I looked at whether regulation was leaving *any* visible footprint in the data.
+>>>malloy
+import "updated.malloy"
+
+run: listings -> regulatory_signals
+>>>markdown
+## Regulation Changes Behaviour — But Not in the Way You'd Hope
+
+The regulatory signals view uses two proxies: `long_stay_pct` (listings requiring 30+ night minimums, a known workaround to reclassify as medium-term rentals and avoid short-stay rules) and `licensed_pct` (listings with a license on file).
+
+Amsterdam and Barcelona do show the highest long-stay percentages — hosts there are clearly responding to regulation by restructuring their listings. But `licensed_pct` tells a different story: compliance with licensing requirements is uneven, and some of the markets with the most regulatory pressure also have the lowest licensing rates.
+
+The pattern that emerges is adaptation, not compliance. Professional operators in regulated cities aren't exiting the market — they're finding structural workarounds. Which raised one more question: if supply is being reshaped by regulation, is that actually affecting what guests pay in the most sought-after neighbourhoods?
+>>>malloy
+import "updated.malloy"
+
+run: listings -> neighbourhood_price_premium + { where: city = 'Amsterdam' or city = 'Barcelona' }
+>>>markdown
+## Premium Neighbourhoods Are Holding Their Price — Supply Constraints May Be Making It Worse
+
+Even in the two most regulated markets in the dataset, top neighbourhoods command significant nightly premiums. Regulation has visibly reduced the *volume* of short-stay listings (reflected in availability and long-stay restructuring), but it hasn't suppressed prices in desirable areas. If anything, constraining supply in high-demand neighbourhoods may be concentrating what remains and keeping rates elevated.
+
+## What This Analysis Shows
+
+Starting from a simple price assumption led somewhere more structurally interesting: Airbnb's markets across these seven cities are not primarily shaped by tourism demand or cost of living — they're shaped by host market structure.
+
+The key findings:
+
+- **Professional operators dominate supply in every city**, including heavily regulated ones — the gap between host share and listing share is the tell
+- **Regulation reshapes listing structure** (minimum nights, licensing) more reliably than it suppresses prices or displaces professional operators
+- **Price outliers that inflate city averages** are likely concentrated among multi-listing professional hosts, not casual home-sharers
+- **The cities that look most "expensive"** may simply be the ones where professionalisation has gone furthest
+
+For anyone analysing short-term rental markets, host concentration is the metric worth watching — more so than headline price figures, which obscure as much as they reveal.
+
+## So What?
+
+The findings here are relevant to three different audiences: policymakers, travelers, and investors. **City governments** can use host concentration and regulatory signals data to evaluate whether existing short-term rental laws are actually working or being ineffective. **Travellers and travel platforms** can use the neighbourhood price premium data to make smarter booking decisions. **Investors** can use host concentration numbers to assess how mature and competitive a short-term rental market is before entering it.

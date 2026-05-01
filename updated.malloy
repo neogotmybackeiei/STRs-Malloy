@@ -1,0 +1,128 @@
+source: listings is duckdb.table('data/cities.csv') extend {
+
+  // ── Dimensions ──────────────────────────────────────────────────────────────
+  dimension: is_entire_home is room_type = 'Entire home/apt'
+  dimension: is_reviewed    is number_of_reviews > 0
+
+  // ── Measures ─────────────────────────────────────────────────────────────────
+  measure: listing_count        is count()
+  measure: host_count           is count(host_id)
+  measure: avg_price            is avg(price)
+  measure: avg_min_nights       is avg(minimum_nights)
+  measure: avg_availability     is avg(availability_365)
+  measure: avg_reviews_per_month is avg(reviews_per_month)
+  measure: total_reviews        is sum(number_of_reviews)
+  measure: pct_entire_home      is listing_count { where: is_entire_home } / listing_count * 100
+
+  // ── View: city snapshot ───────────────────────────────────────────────────────
+  // High-level summary per city — good for a quick market comparison
+  view: by_city is {
+    group_by: city
+    aggregate:
+      listing_count
+      host_count
+      avg_price
+      avg_availability
+      avg_reviews_per_month
+      pct_entire_home
+    order_by: listing_count desc
+  }
+
+  // ── View: room type breakdown ─────────────────────────────────────────────────
+  // How inventory and pricing differ across room types, within each city
+  view: room_type_breakdown is {
+    group_by:
+      city
+      room_type
+    aggregate:
+      listing_count
+      avg_price
+      avg_min_nights
+      total_reviews
+    order_by: city, listing_count desc
+  }
+
+  // ── Dimensions & measures for deeper views ────────────────────────────────────
+  dimension: is_multi_listing_host is calculated_host_listings_count > 1
+  dimension: is_long_stay          is minimum_nights >= 30
+  dimension: has_license           is license is not null
+
+  measure: multi_listing_host_count  is count(host_id) { where: is_multi_listing_host }
+  measure: listings_by_multi_hosts   is listing_count { where: is_multi_listing_host }
+  measure: long_stay_listings        is listing_count { where: is_long_stay }
+  measure: licensed_listings         is listing_count { where: has_license }
+  measure: reviews_ltm               is sum(number_of_reviews_ltm)
+  measure: value_index               is avg(reviews_per_month / price)  // activity per $ spent
+
+  // ── View: host concentration ──────────────────────────────────────────────────
+  // Shows how much of each city's supply is controlled by multi-listing "professional" hosts
+  // vs single-listing casual hosts. High pct_listings_by_multi_hosts signals
+  // a more commercialised market.
+  view: host_concentration is {
+    group_by: city
+    aggregate:
+      listing_count
+      host_count
+      multi_listing_host_count
+      listings_by_multi_hosts
+      // share of hosts that are multi-listers
+      pct_multi_hosts        is multi_listing_host_count / host_count * 100
+      // share of supply controlled by multi-listers
+      pct_listings_by_multi  is listings_by_multi_hosts / listing_count * 100
+      // avg listings per multi-listing host — how large are the big operators?
+      avg_listings_per_multi_host is listings_by_multi_hosts / multi_listing_host_count
+    order_by: pct_listings_by_multi desc
+  }
+
+  // ── View: neighbourhood price premium ────────────────────────────────────────
+  // Ranks neighbourhoods within each city by how much their median price
+  // exceeds the city-wide median. Useful for spotting premium pockets and
+  // value neighbourhoods. Filter to neighbourhoods with enough listings
+  // to be statistically meaningful (>= 10).
+  view: neighbourhood_price_premium is {
+    group_by:
+      city
+      neighbourhood
+    aggregate:
+      listing_count
+      avg_price
+      avg_reviews_per_month
+      avg_availability
+    having: listing_count >= 10
+    order_by: avg_price desc
+  }
+
+  // ── View: minimum nights as regulatory proxy ──────────────────────────────────
+  // Cities with STR regulations (Paris, Amsterdam, Barcelona) often push hosts
+  // toward 30+ night minimums to sidestep short-stay rules.
+  // High long_stay_pct or low licensed_pct are signals of regulatory pressure.
+  view: regulatory_signals is {
+    group_by: city
+    aggregate:
+      listing_count
+      long_stay_listings
+      licensed_listings
+      long_stay_pct    is long_stay_listings / listing_count * 100
+      licensed_pct     is licensed_listings / listing_count * 100
+      avg_min_nights
+    order_by: long_stay_pct desc
+  }
+
+  // ── View: cross-city value comparison ────────────────────────────────────────
+  // Compares cities on price, demand (reviews/month), availability, and a
+  // value_index (review activity per dollar). A high value_index means guests
+  // are getting more booking activity per $ — useful for ranking cities by
+  // guest-perceived value vs cost.
+  view: cross_city_value is {
+    group_by: city
+    aggregate:
+      listing_count
+      avg_price
+      avg_reviews_per_month
+      reviews_ltm
+      avg_availability
+      value_index
+      pct_entire_home
+    order_by: value_index desc
+  }
+}
